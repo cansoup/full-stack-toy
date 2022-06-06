@@ -22,8 +22,8 @@ const server = new ApolloServer({
   typeDefs: schema,
   resolvers,
   // resolver들이 참조할 데이터, 즉 DB 역할을 하는 models에 대한 정의
-  db: {
-    models: {
+  context: {
+    db: {
       messages: readDB('messages'),
       users: readDB('users'),
     }
