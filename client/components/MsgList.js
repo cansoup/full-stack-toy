@@ -1,8 +1,9 @@
 import MsgItem from "./MsgItem";
 import MsgInput from "./MsgInput";
 import { useRouter } from 'next/router'
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import fetcher from "../fetcher";
+import useInfiniteScroll from "../hooks/useInfiniteScroll";
 
 const MsgList = () => {
   const { query } = useRouter();
@@ -10,6 +11,9 @@ const MsgList = () => {
 
   const [msgs, setMsgs] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [hasNext, setHasNext] = useState(true)
+  const fetchMoreEl = useRef(null);
+  const intersecting = useInfiniteScroll(fetchMoreEl); // 화면상에 fetchMoreEl이 노출됐을 때 true, 아닐 때 false
 
   const onCreate = async text => {
     // userId는 queryString으로 받아온다.
@@ -49,13 +53,17 @@ const MsgList = () => {
 
   // useEffect 내부에서는 async await을 사용하지 않는 것을 권장
   const getMessages = async () => {
-    const msgs = await fetcher('get', '/messages');
-    setMsgs(msgs);
+    const newMsgs = await fetcher('get', '/messages', { params: {cursor: msgs[msgs.length - 1]?.id || ''}});
+    if(newMsgs.length === 0) {
+      setHasNext(false)
+      return;
+    }
+    setMsgs(msgs => [...msgs, ...newMsgs]);
   }
-  // useEffect: 컴포넌트 로딩 시 최초 한 번 실행
+  
   useEffect(() => {
-    getMessages();
-  }, [])
+    if (intersecting && hasNext) getMessages()
+  }, [intersecting])
 
   return (
     <>
@@ -73,6 +81,7 @@ const MsgList = () => {
           />
         ))}
       </ul>
+      <div ref={fetchMoreEl} />
     </>
   );
 };
