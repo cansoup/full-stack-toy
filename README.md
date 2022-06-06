@@ -43,3 +43,26 @@ graphQL사용하여 풀스택 구현해보기
   nodemon.js 어떤 것들을 감지해서 변경사항을 반영할지 또는 무시할지(새로고침을 하지 않을지) 설정할 수 있고, 환경정보도 설정할 수 있다.
 - nodeJS에서는 기본적으로 es6에서 제공하는 모듈 문법을 사용할 수 없다.
   package.json에 `"type": "module"`을 사용하면 모듈 문법을 사용 가능 하다.
+
+## 0530
+
+### express
+
+- [공식문서](https://expressjs.com/ko/)
+- Node.js 웹 애플리케이션 프레임워크
+- Node 자체가 다른 일반적인 웹 개발 기능을 지원하지 않는다. 만약 다른 HTTP 패턴(get, post, delete 등)에 대한 특정 처리를 추가하려면 서로 다른 URL 경로(routes)를 사용하여 요청을 개별적으로 처리, 정적 파일을 제공, 템플릿을 사용하여 동적으로 응답을 생성할 수 있으며, 코드를 직접 작성할 필요가 생기게 된다. 하지만 기본적인 것들을 직접 구현하는 작업을 피하고 웹 프레임 워크를 사용할 수 있다 => express의 역할 (출처: mdn)
+- server/package.json에서 start 명령어가 실행될 때 nodemon에서 `src/index.js`를 노드 명령어로 실행하도록 하면서 express가 구동이 되고, 이 때 localhost 8000을 구독을 하는 상태가 된다.
+
+### uuid
+
+- Universally Unique Identifier
+- UUID를 생성해주는 라이브러리
+- v4: 랜덤값 기반
+
+### json 주의사항
+
+- stringfy -> parse 할 때 숫자형은 숫자형으로 변환해주는데 url에서 들어오는 값은 문자열이니 주의할 것
+
+### 더미 데이터
+
+[링크](https://github.com/faker-js/faker)

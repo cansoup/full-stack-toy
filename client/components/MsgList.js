@@ -1,82 +1,75 @@
 import MsgItem from "./MsgItem";
 import MsgInput from "./MsgInput";
-import { useState } from "react";
-
-const UserIds = ['roy', 'jay'];
-const getRandomUserId = () => UserIds[Math.round(Math.random())];
-
-const originalMsgs = Array(50)
-  .fill(0)
-  .map((_, i) => ({
-    id: 50 - i,
-    userId: getRandomUserId(),
-    timestamp: 1234567890123 + (50 - i) * 1000 * 60,
-    text: `${50 - i} mock text`
-  }));
-
-// [
-//   {
-//     id: 1,
-//     userId: getRandomUserId(),
-//     timestamp: 1234567890123,
-//     text: '1 mock text'
-//   }
-// ]
+import { useRouter } from 'next/router'
+import { useEffect, useState } from "react";
+import fetcher from "../fetcher";
 
 const MsgList = () => {
-  const [msgs, setMsgs] = useState(originalMsgs);
+  const { query } = useRouter();
+  const userId = query.userId || query.userid || ''
+
+  const [msgs, setMsgs] = useState([]);
   const [editingId, setEditingId] = useState(null);
 
-  const onCreate = text => {
-    const newMsg = {
-      id: msgs.length + 1,
-      userId: getRandomUserId(),
-      timestamp: Date.now(),
-      text: `${msgs.length + 1} ${text}`
-    }
+  const onCreate = async text => {
+    // userId는 queryString으로 받아온다.
+    const newMsg = await fetcher('post', '/messages', { text, userId })
+    if(!newMsg) throw Error('something wrong');
     // msgs.unshift(newMsg); // unshift만 하면 변경된 사항을 감지하지 못한다. -> state 사용 필요
     setMsgs(msgs => ([newMsg, ...msgs]));
   }
 
-  const onUpdate = (text, id) => {
+  const onUpdate = async (text, id) => {
+    const newMsg = await fetcher('put', `/messages/${id}`, {text, userId});
+    if(!newMsg) throw Error('something wrong');
     // setState는 함수형으로 쓰는 것을 권장
     setMsgs(msgs => {
       const targetIndex = msgs.findIndex(msgs => msgs.id === id);
       if ( targetIndex < 0 ) return msgs;
       const newMsgs = [...msgs];
-      newMsgs.splice(targetIndex, 1, {
-        ...msgs[targetIndex],
-        text,
-      })
+      newMsgs.splice(targetIndex, 1, newMsg)
       return newMsgs;
     })
     doneEdit();
   }
-
-  const doneEdit = () => setEditingId(null);
-
-  const onDelete = (id) => {
+  
+  const onDelete = async (id) => {
+    // params로 넣어준 값은 서버에서의 응답 요청은 query로 들어가 있다.
+    const receivedId = await fetcher('delete', `/messages/${id}`, { params: {userId} });
     setMsgs(msgs => {
-      const targetIndex = msgs.findIndex(msgs => msgs.id === id);
+      const targetIndex = msgs.findIndex(msgs => msgs.id === receivedId + '');
       if ( targetIndex < 0 ) return msgs;
       const newMsgs = [...msgs];
       newMsgs.splice(targetIndex, 1)
       return newMsgs;
     })
   }
+  
+  const doneEdit = () => setEditingId(null);
+
+  // useEffect 내부에서는 async await을 사용하지 않는 것을 권장
+  const getMessages = async () => {
+    const msgs = await fetcher('get', '/messages');
+    setMsgs(msgs);
+  }
+  // useEffect: 컴포넌트 로딩 시 최초 한 번 실행
+  useEffect(() => {
+    getMessages();
+  }, [])
 
   return (
     <>
-      <MsgInput mutate={onCreate} />
+      {userId && <MsgInput mutate={onCreate} />}
       <ul className="messages">
         {msgs.map(x => (
           <MsgItem 
             key={x.id} 
             {...x} 
             onUpdate={onUpdate} 
+            onDelete={() => onDelete(x.id)}
             startEdit={() => setEditingId(x.id)} 
             isEditing={editingId === x.id}
-            onDelete={() => onDelete(x.id)}
+            myId={userId}
           />
         ))}
       </ul>
