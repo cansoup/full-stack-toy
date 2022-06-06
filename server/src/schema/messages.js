@@ -7,7 +7,7 @@ const messageSchema = gql `
   type Message {
     id: ID!
     text: String!
-    user: User!
+    userId: ID!
     timestamp: Float #13자리 숫자(정수형에 자릿수 제한이 있으므로 Float 사용)
   }
 

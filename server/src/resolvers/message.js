@@ -13,7 +13,7 @@ const setMsgs = data => {
 const messageResolver = {
   Query: {
     messages: (parent, args, { db }) => {
-      // console.log(parent, args, context);
+      console.log(db);
       return db.messages
     },
     message: (parent, {id = ''}, { db }) => {
