@@ -13,7 +13,6 @@ const setMsgs = data => {
 const messageResolver = {
   Query: {
     messages: (parent, args, { db }) => {
-      console.log(db);
       return db.messages
     },
     message: (parent, {id = ''}, { db }) => {
@@ -21,25 +20,26 @@ const messageResolver = {
     }
   },
   Mutation: {
-    updateMessage: (parent, {text, userId}, {db}) => {
+    updateMessage: (parent, {id, text, userId}, {db}) => {
+      const targetIndex = db.messages.findIndex(msg => msg.id === id)
+      if (targetIndex < 0) throw Error('메시지가 없습니다.')
+      if (db.messages[targetIndex].userId !== userId) throw Error('사용자가 다릅니다.')
+
+      const newMsg = { ...db.messages[targetIndex], text }
+      db.messages.splice(targetIndex, 1, newMsg)
+      setMsgs(db.messages)
+      return newMsg
+    },
+    createMessage: (parent, {text, userId}, {db}) => {
+      if(!userId) throw Error('사용자가 없습니다.');
       const newMsg = {
         id: v4(),
         text,
         userId,
-        timestamp: Date.now(),
-      };
+        timestamp: Date.now()
+      }
       db.messages.unshift(newMsg);
       setMsgs(db.messages);
-      return (newMsg);
-    },
-    createMessage: (parent, {id, text, userId}, {db}) => {
-      const targetIndex = db.messages.findIndex(msg => msg.id === id)
-      if (targetIndex < 0) throw Error('메시지가 없습니다');
-      if (db.messages[targetIndex].userId !== userId) throw Error('사용자가 다릅니다');
-
-      const newMsg = { ...db.messages[targetIndex], text }
-      db.messages.splice(targetIndex, 1, newMsg);
-      setMsgs(db.messages)
       return newMsg
     },
     deleteMessage: (parent, {id, userId}, {db}) => {

@@ -26,7 +26,7 @@ export const GET_MESSAGE = gql `
 
 export const CREATE_MESSAGE = gql`
   mutation CREATE_MESSAGE($text: String!, $userId: ID!) {
-    createMessage(text: $text, userId: $userId!) {
+    createMessage(text: $text, userId: $userId) {
       id
       text
       userId

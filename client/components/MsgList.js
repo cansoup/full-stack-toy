@@ -1,69 +1,77 @@
 import MsgItem from "./MsgItem";
 import MsgInput from "./MsgInput";
+import { useMutation, useQuery, useQueryClient } from "react-query";
 import { useRouter } from 'next/router'
 import { useEffect, useState, useRef } from "react";
-import fetcher from "../fetcher";
-import useInfiniteScroll from "../hooks/useInfiniteScroll";
+import { fetcher, QueryKeys } from "../queryClient";
+import { CREATE_MESSAGE, DELETE_MESSAGE, GET_MESSAGES, UPDATE_MESSAGE } from "../graphql/message";
+// import useInfiniteScroll from "../hooks/useInfiniteScroll";
 
 const MsgList = ({smsgs, users}) => {
-  const { query } = useRouter();
-  const userId = query.userId || query.userid || ''
-
+  const client = useQueryClient(); // useQueryClient를 통해 client에 접속할 수 있다.
+  const { query: { userId = ''} } = useRouter();
   const [msgs, setMsgs] = useState(smsgs);
   const [editingId, setEditingId] = useState(null);
-  const [hasNext, setHasNext] = useState(true)
-  const fetchMoreEl = useRef(null);
-  const intersecting = useInfiniteScroll(fetchMoreEl); // 화면상에 fetchMoreEl이 노출됐을 때 true, 아닐 때 false
 
-  const onCreate = async text => {
-    // userId는 queryString으로 받아온다.
-    const newMsg = await fetcher('post', '/messages', { text, userId })
-    if(!newMsg) throw Error('something wrong');
-    // msgs.unshift(newMsg); // unshift만 하면 변경된 사항을 감지하지 못한다. -> state 사용 필요
-    setMsgs(msgs => ([newMsg, ...msgs]));
-  }
+  // const [hasNext, setHasNext] = useState(true)
+  // const fetchMoreEl = useRef(null);
+  // const intersecting = useInfiniteScroll(fetchMoreEl); // 화면상에 fetchMoreEl이 노출됐을 때 true, 아닐 때 false
 
-  const onUpdate = async (text, id) => {
-    const newMsg = await fetcher('put', `/messages/${id}`, {text, userId});
-    if(!newMsg) throw Error('something wrong');
-    // setState는 함수형으로 쓰는 것을 권장
-    setMsgs(msgs => {
-      const targetIndex = msgs.findIndex(msgs => msgs.id === id);
-      if ( targetIndex < 0 ) return msgs;
-      const newMsgs = [...msgs];
-      newMsgs.splice(targetIndex, 1, newMsg)
-      return newMsgs;
-    })
-    doneEdit();
-  }
-  
-  const onDelete = async (id) => {
-    // params로 넣어준 값은 서버에서의 응답 요청은 query로 들어가 있다.
-    const receivedId = await fetcher('delete', `/messages/${id}`, { params: {userId} });
-    setMsgs(msgs => {
-      const targetIndex = msgs.findIndex(msgs => msgs.id === receivedId + '');
-      if ( targetIndex < 0 ) return msgs;
-      const newMsgs = [...msgs];
-      newMsgs.splice(targetIndex, 1)
-      return newMsgs;
-    })
-  }
+  const { mutate: onCreate } = useMutation(({ text }) => fetcher(CREATE_MESSAGE, { text, userId }), {
+    onSuccess: ({ createMessage }) => {
+      // 명령이 성공했을 때 이것(createMessage - gql에서 정의한 값)을 가지고 graphQl이 클라이언트에 들고 있는 캐시 정보에 새로 가져온 정보를 업데이트 해주는 방식
+      client.setQueryData(QueryKeys.MESSAGES, old => {
+        return {
+          messages: [ createMessage, ...old.messages]
+        }
+      })
+    }
+  }); 
+
+  const { mutate: onUpdate } = useMutation(({ text, id }) => fetcher(UPDATE_MESSAGE, { id, text, userId }), {
+    onSuccess: ({ updateMessage }) => {
+      client.setQueryData(QueryKeys.MESSAGES, old => {
+        const targetIndex = old.messages.findIndex(msgs => msgs.id === updateMessage.id);
+        if ( targetIndex < 0 ) return old;
+        const newMsgs = [...old.messages];
+        newMsgs.splice(targetIndex, 1, updateMessage)
+        return { messages: newMsgs};
+      })
+      doneEdit();
+    }
+  });
+
+  const { mutate: onDelete } = useMutation( id => fetcher(DELETE_MESSAGE, { id, userId }), {
+    onSuccess: ({ deleteMessage: deletedId }) => {
+      client.setQueryData(QueryKeys.MESSAGES, old => {
+        const targetIndex = old.messages.findIndex(msgs => msgs.id === deletedId);
+        if ( targetIndex < 0 ) return old;
+        const newMsgs = [...old.messages];
+        newMsgs.splice(targetIndex, 1)
+        return { messages: newMsgs};
+      })
+    }
+  })
   
   const doneEdit = () => setEditingId(null);
 
-  // useEffect 내부에서는 async await을 사용하지 않는 것을 권장
-  const getMessages = async () => {
-    const newMsgs = await fetcher('get', '/messages', { params: {cursor: msgs[msgs.length - 1]?.id || ''}});
-    if(newMsgs.length === 0) {
-      setHasNext(false)
-      return;
-    }
-    setMsgs(msgs => [...msgs, ...newMsgs]);
-  }
-  
+  const { data, error, isError } = useQuery(QueryKeys.MESSAGES, () => fetcher(GET_MESSAGES));
+
+  // 변경된 데이터를 반영하는 구문
   useEffect(() => {
-    if (intersecting && hasNext) getMessages()
-  }, [intersecting])
+    if(!data?.messages) return;
+    console.log('msgs changed');
+    setMsgs(data?.messages || []);
+  }, [data?.messages])
+
+  if(isError) {
+    console.error(error);
+    return null;
+  };
+  
+  // useEffect(() => {
+  //   if (intersecting && hasNext) getMessages()
+  // }, [intersecting])
 
   return (
     <>
@@ -78,11 +86,11 @@ const MsgList = ({smsgs, users}) => {
             startEdit={() => setEditingId(x.id)} 
             isEditing={editingId === x.id}
             myId={userId}
-            user={users[x.userId]}
+            user={users.find(x => userId === x.userId)}
           />
         ))}
       </ul>
-      <div ref={fetchMoreEl} />
+      {/* <div ref={fetchMoreEl} /> */}
     </>
   );
 };
